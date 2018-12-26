@@ -1,14 +1,15 @@
 import socket
 import koji as brew
 from operator import attrgetter
+import re
  
  
 class IRCBot:
     def __init__(self, **kwargs):
         self.settings = {
-            'host':"xxx.xxx.xxx",
+            'host':"xxx.xxx.xxx.xxx",
             'port':6667,
-            'channel':"#xxx",
+            'channel':"#nlp",
             'contact': ":",
             'nick':"redbot-rt",
             'ident':'redbot-rt',
@@ -19,14 +20,7 @@ class IRCBot:
         self.main_loop()
     def add_kwargs(self, kwargs):
         '''
-        add keyword args as class attributes. This allows you to change the settings based on 
-        dict arg, and not have to hard code it in. The settings keys become this class' attributes. 
-        And the value becomes the value for those attributes. 
-        AKA
-        self.nick = "mybot"  etc.
-         
-        IRCbot(**{nick:"mybot2"})
-        IRCbot(**{nick:"mybot3"})
+        add keyword args as class attributes. 
         '''
         for kwarg in kwargs:
             if kwarg in self.settings:
@@ -111,6 +105,39 @@ class IRCBot:
         '''
         self.sock.send('PRIVMSG {0} :{1}\r\n'.format(self.channel, string).encode())
     
+    def split_nvr(self, nvr):
+        '''
+        To split nvr for the purpose of competing
+        '''
+        return re.findall('\d+',nvr.split("-")[-1])
+
+    def compete_nvr(self, a, b, flag):
+        '''
+        compete nvr to know the newer kernel-rt version 
+        '''
+        if not b:
+            return True
+
+        if flag == "y":
+            if not (a.split("-")[-1].split(".")[0]).isdigit():
+                return False
+        elif flag == "z":
+            if not ("".join(a.split("-")[-1].split(".")[:3])).isdigit():
+                return False
+
+        a_list = self.split_nvr(a)
+        b_list = self.split_nvr(b)
+
+        for i in range(len(a_list)):
+            if int(a_list[i]) > int(b_list[i]):
+                return True
+            elif int(a_list[i]) < int(b_list[i]):
+                return False
+            else:
+                continue
+
+        return False
+
     def responseInfo(self, volumeID, pre_nvr=''):
         '''
         get package info, builds list, latest build ...
@@ -125,9 +152,10 @@ class IRCBot:
         for build in build_list:
             if pre_nvr == '':
                 if build.has_key('nvr') and build['nvr'] and '+' not in build['nvr']:
-                    if len((build['nvr']).split('.')) == 6 and (build['nvr'] > latest_version_y):
+                    if len((build['nvr']).split('.')) == 6 and self.compete_nvr(build['nvr'], latest_version_y, "y"):
+                        build['nvr'].split('-')[-1].split('.')
                         latest_version_y = build['nvr']
-                    elif len((build['nvr']).split('.')) == 8 and (build['nvr'] > latest_version_z):
+                    elif len((build['nvr']).split('.')) == 8 and self.compete_nvr(build['nvr'], latest_version_z, "z"):
                         latest_version_z = build['nvr']
                     else:
                         continue
@@ -135,9 +163,9 @@ class IRCBot:
                     continue
             else:
                 if build.has_key('nvr') and build['nvr'] and '+' not in build['nvr'] and (pre_nvr == ".".join(((build['nvr']).split("."))[:3])):
-                    if len((build['nvr']).split('.')) == 6 and (build['nvr'] > latest_version_y):
+                    if len((build['nvr']).split('.')) == 6 and self.compete_nvr(build['nvr'], latest_version_y, "y"):
                         latest_version_y = build['nvr']
-                    elif len((build['nvr']).split('.')) == 8 and (build['nvr'] > latest_version_z):
+                    elif len((build['nvr']).split('.')) == 8 and self.compete_nvr(build['nvr'], latest_version_z, "z"):
                         latest_version_z = build['nvr']
                     else:
                         continue
@@ -145,8 +173,8 @@ class IRCBot:
                     continue
             
         if latest_version_y:
-            string_y = self.username + ': Latest RT brew build: ' + latest_version_y
-            string_z = self.username + ': Latest RT brew build: ' + latest_version_z
+            string_y = self.username + ': Latest RT brew build [Y]: ' + latest_version_y
+            string_z = self.username + ': Latest RT brew build [Z]: ' + latest_version_z
             self.sock.send('PRIVMSG {0} :{1}\r\n'.format(self.channel, string_y).encode())
             self.sock.send('PRIVMSG {0} :{1}\r\n'.format(self.channel, string_z).encode())
         else:
