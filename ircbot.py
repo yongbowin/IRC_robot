@@ -7,7 +7,7 @@ import re
 class IRCBot:
     def __init__(self, **kwargs):
         self.settings = {
-            'host':"xxx.xxx.xxx.xxx",
+            'host':"xx.xx.xx.xx.xx",
             'port':6667,
             'channel':"#nlp",
             'contact': ":",
@@ -171,14 +171,15 @@ class IRCBot:
                         continue
                 else:
                     continue
-            
+        
         if latest_version_y:
             string_y = self.username + ': Latest RT brew build [Y]: ' + latest_version_y
-            string_z = self.username + ': Latest RT brew build [Z]: ' + latest_version_z
             self.sock.send('PRIVMSG {0} :{1}\r\n'.format(self.channel, string_y).encode())
+        if latest_version_z:
+            string_z = self.username + ': Latest RT brew build [Z]: ' + latest_version_z
             self.sock.send('PRIVMSG {0} :{1}\r\n'.format(self.channel, string_z).encode())
-        else:
-            string = self.username + ': Error'
+        if (not latest_version_y) and (not latest_version_z):
+            string = self.username + ': No items match.'
             self.sock.send('PRIVMSG {0} :{1}\r\n'.format(self.channel, string).encode())
 
     def check_command(self):
